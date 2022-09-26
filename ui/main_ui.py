@@ -7,16 +7,16 @@ CALLED = lambda: inspect.stack()[1][3]
 
 class MainCli(cmd.Cmd):
     GAME_MODES = ['1']
+    SERVICE_COMMANDS = ['exit', 'help']
 
     def __init__(self):
         cmd.Cmd.__init__(self)
-        self.prompt = "> "
+        self.prompt = '> '
         self.ruler = '—'
         self.intro = ('Добро пожаловать в игру "Пентамино"\n'
                       'Для справки наберите "help"')
-        # self.doc_header = ('Доступные команды (для справки по конкретной '
-        #                    'команде наберите "help _команда_)')
-        self.doc_header = ''
+        self.doc_header = ('Доступные команды (для справки по конкретной '
+                           'команде наберите "help _команда_)')
 
     def default(self, line):
         print('Несуществующая команда')
@@ -25,7 +25,8 @@ class MainCli(cmd.Cmd):
         print('Какую доску будете заполнять?')
 
     def postcmd(self, stop: bool, line: str) -> bool:
-        self.control_panel()
+        if line not in self.SERVICE_COMMANDS:
+            self.control_panel()
         return stop
 
     def do_start(self, args):
@@ -41,68 +42,64 @@ class MainCli(cmd.Cmd):
 
     def do_exit(self, arg):
         """exit - выход из игры"""
-        print('Пока!')
+        print('Вы покинули игру!')
         return True
 
     def do_about(self, args):
         """about - Информация о игре"""
         print("Информация о игре")
-        print(f'Аргумениты команды {CALLED()[3:]} {args=}')
+        # print(f'Аргумениты команды {CALLED()[3:]} {args=}')
+
+    def do_board(self, arg):
+        """board - Показать доску"""
+        test_board = [
+            '  1234567891011  ',
+            'a ·FFI····· · · a',
+            'b FF·I····· · · b',
+            'c ·F·I····· · · c',
+            'e ···I····· · · e',
+            'd ···I····· · · d',
+            '  1234567891011  ',
+        ]
+        self.own_print_topics(
+            'Доска', test_board, 15, len(test_board[0]), ruler=False
+        )
 
     def control_panel(self):
-        print('Возможные действия')
-        self.do_help('')
+        '''Выводит возможные варианты команд'''
+        names = self.get_names()
+        cmds_doc = []
+        cmds_undoc = []
+        help = {}
+        for name in names:
+            if name[:5] == 'help_':
+                help[name[5:]] = 1
+        names.sort()
+        # There can be duplicates if routines overridden
+        prevname = ''
+        for name in names:
+            if name[:3] == 'do_':
+                if name == prevname:
+                    continue
+                prevname = name
+                cmd1 = name[3:]
+                if cmd1 in help:
+                    cmds_doc.append(cmd1)
+                    del help[cmd1]
+                elif getattr(self, name).__doc__:
+                    cmds_doc.append(cmd1)
+                else:
+                    cmds_undoc.append(cmd1)
+        self.own_print_topics('Возможные действия', cmds_doc, 15, 80)
 
-    def do_help(self, arg):
-        '''List available commands with "help" or detailed help with "help cmd".'''
-        if arg:
-            # XXX check arg syntax
-            try:
-                func = getattr(self, 'help_' + arg)
-            except AttributeError:
-                try:
-                    doc=getattr(self, 'do_' + arg).__doc__
-                    if doc:
-                        self.stdout.write("%s\n"%str(doc))
-                        return
-                except AttributeError:
-                    pass
-                self.stdout.write("%s\n"%str(self.nohelp % (arg,)))
-                return
-            func()
-        else:
-            print('else')
-            names = self.get_names()
-            cmds_doc = []
-            cmds_undoc = []
-            help = {}
-            for name in names:
-                if name[:5] == 'help_':
-                    help[name[5:]]=1
-            names.sort()
-            # There can be duplicates if routines overridden
-            prevname = ''
-            for name in names:
-                if name[:3] == 'do_':
-                    if name == prevname:
-                        continue
-                    prevname = name
-                    cmd=name[3:]
-                    if cmd in help:
-                        cmds_doc.append(cmd)
-                        del help[cmd]
-                    elif getattr(self, name).__doc__:
-                        cmds_doc.append(cmd)
-                    else:
-                        cmds_undoc.append(cmd)
-            self.stdout.write("%s\n"%str(self.doc_leader))
-            self.print_topics(self.doc_header,   cmds_doc,   15,80)
-            #self.print_topics(self.misc_header,  list(help.keys()),15,80)
-            #self.print_topics(self.undoc_header, cmds_undoc, 15,80)
-            print('end', self.doc_leader)
-            print('end', self.get_names())
-            print('cmds_doc', self.print_topics('', cmds_doc, 15, 80))
-            # print('cmds_doc', self.print_topics(self.doc_header,   cmds_doc, 15, 80))
+    def own_print_topics(self, header, cmds, cmdlen, maxcol, ruler=True):
+        if cmds:
+            self.stdout.write("\n")
+            self.stdout.write("%s\n"%str(header))
+            if ruler and self.ruler:
+                self.stdout.write("%s\n"%str(self.ruler * len(header)))
+            self.columnize(cmds, maxcol-1)
+            # self.stdout.write("\n")
 
 
 if __name__ == "__main__":
